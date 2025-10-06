@@ -1,0 +1,1 @@
+{"version":3,"file":"top-message-bar-view.d.ts","sourceRoot":"","sources":["../../../../../src/platform-implementation-js/widgets/top-message-bar-view.ts"],"names":[],"mappings":"AACA,OAAO,KAAK,wBAAwB,MAAM,0DAA0D,CAAC;AACrG,OAAO,YAAY,MAAM,2BAA2B,CAAC;AAOrD,MAAM,CAAC,OAAO,OAAO,iBAAkB,SAAQ,YAAY;gBAC7C,OAAO,EAAE;QAAE,uBAAuB,EAAE,wBAAwB,CAAA;KAAE;IAQ1E,MAAM;CAGP"}

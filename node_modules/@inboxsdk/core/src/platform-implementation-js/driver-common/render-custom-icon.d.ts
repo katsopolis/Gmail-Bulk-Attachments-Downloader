@@ -1,0 +1,2 @@
+export default function renderCustomIcon(containerElement: HTMLElement, customIconElement: HTMLElement, append: boolean, insertBeforeEl?: HTMLElement | null | undefined): void;
+//# sourceMappingURL=render-custom-icon.d.ts.map

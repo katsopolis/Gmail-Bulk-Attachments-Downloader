@@ -1,0 +1,1 @@
+{"version":3,"file":"SimpleElementView.d.ts","sourceRoot":"","sources":["../../../../../src/platform-implementation-js/views/SimpleElementView.ts"],"names":[],"mappings":"AAAA,OAAO,gBAAgB,MAAM,2BAA2B,CAAC;AAEzD,MAAM,CAAC,OAAO,OAAO,iBAAkB,SAAQ,gBAAgB;IAC7D,EAAE,EAAE,WAAW,CAAC;IAChB,SAAS,EAAE,OAAO,CAAS;gBAEf,EAAE,EAAE,WAAW;IAK3B,OAAO;CAMR"}

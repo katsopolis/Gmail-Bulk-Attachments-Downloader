@@ -1,0 +1,63 @@
+import * as Kefir from 'kefir';
+import KeyboardShortcutHandle from '../../../../views/keyboard-shortcut-handle';
+import { ButtonViewI } from '../../../../widgets/buttons/basic-button-view-controller';
+export interface ButtonViewOptions {
+    hasButtonToLeft?: boolean | null;
+    hasButtonToRight?: boolean | null;
+    iconClass?: string | null;
+    iconLiga?: string;
+    iconUrl?: string | null;
+    text?: string | null;
+    title?: string | null;
+    tooltip?: string | null;
+    enabled?: boolean | null;
+    hasDropdown?: boolean | null;
+    buttonColor?: string | null;
+    keyboardShortcutHandle?: KeyboardShortcutHandle | null;
+    noArrow?: boolean | null;
+}
+export default class ButtonView implements ButtonViewI {
+    #private;
+    private _element;
+    private _innerElement;
+    private _textElement;
+    private _iconElement;
+    private _iconImgElement;
+    private _iconClass;
+    private _iconUrl;
+    private _title;
+    private _tooltip;
+    private _hasDropdown;
+    private _buttonColor;
+    private _isEnabled;
+    private _keyboardShortcutHandle;
+    private _eventStream;
+    constructor(options: ButtonViewOptions);
+    destroy(): void;
+    getElement(): HTMLElement;
+    getEventStream(): Kefir.Observable<any, any>;
+    activate(): void;
+    deactivate(): void;
+    addClass(className: string): void;
+    removeClass(className: string): void;
+    simulateHover(): void;
+    setEnabled(value: boolean): void;
+    isEnabled(): boolean;
+    update(options: any): void;
+    private _createElement;
+    private _setupMainElement;
+    private _setupInnerElement;
+    private _createTextElement;
+    private _createIconElement;
+    private _createIconImgElement;
+    private _updateButtonColor;
+    private _updateTitle;
+    private _updateTooltip;
+    private _updateIconUrl;
+    private _updateIconClass;
+    private _setEnabled;
+    private _setupEventStream;
+    private _setupKeyboardShortcutEvent;
+    private _setupAestheticEvents;
+}
+//# sourceMappingURL=button-view.d.ts.map

@@ -1,0 +1,1 @@
+{"version":3,"file":"getDiscardStream.d.ts","sourceRoot":"","sources":["../../../../../../src/platform-implementation-js/driver-common/compose/getDiscardStream.ts"],"names":[],"mappings":"AACA,OAAO,KAAK,KAAK,MAAM,OAAO,CAAC;AAc/B,MAAM,CAAC,OAAO,UAAU,gBAAgB,CAAC,EACvC,OAAO,EACP,aAAa,GACd,EAAE;IACD,OAAO,EAAE,WAAW,CAAC;IACrB,aAAa,EAAE,WAAW,CAAC;CAC5B;;;;;UA0BA"}

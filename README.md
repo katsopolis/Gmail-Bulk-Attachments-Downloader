@@ -1,32 +1,44 @@
-# <img src="img/logo_128.png" width="35" height="35"/> Gmail - Download Attachments (Chromium Extension)
+﻿# Gmail Bulk Attachments Downloader
 
-## 🚀 What's this extension?
-A Gmail extension for Chromium browsers that allows to download all files in the mail with an integrated button.
+![Extension logo](img/logo_128.png)
 
-## 🛠️ How does it work?
-- Simply puts a button to download attachments next to Drive icon.
+Gmail Bulk Attachments Downloader adds a toolbar button that downloads every attachment in the open Gmail conversation with a single click, preserving each file's original name, format, and size.
 
-## 📥 Installation
-1. Download the latest release from the [Releases](https://github.com/katsopolis/Gmail-DownloadAttachments/releases) page.
-2. Extract the `Gmail Attachments Downloader` folder to anywhere.
-3. Enable the Developer Mode on chrome://extensions/.
-4. Load the unpacked folder.
+## Key Features
+- Uses InboxSDK to request Gmail's official attachment download URLs instead of thumbnail proxies.
+- Sanitises filenames so Chrome writes the exact Gmail title safely to disk.
+- Falls back to DOM metadata when Gmail delays the download URL.
+- Skips Drive items when Gmail refuses to expose the original link and logs a warning so you can fetch them manually if needed.
 
-## 🎯 How to Use
-- Enable the extension.
-- Open an e-mail with attachments.
-- Find the icon on top right.
-- Click on it and see the magic.
+## Preview
+Below is the toolbar button added by the extension:
 
-## 🖼️ SS's
-![Alt text](img/screenshot1.png?raw=true "Batch Download Icon")
+![Toolbar button](img/save.png)
 
-## ⚠️ Disclaimer
-**The author is not responsible for any problem according to this extension.**  
+## Installation
+1. Download or clone this repository (GmailBulkAttachmentsDownload).
+2. Open chrome://extensions in a Chromium-based browser and enable **Developer mode**.
+3. Choose **Load unpacked** and select the GmailBulkAttachmentsDownload folder.
 
-## ❓ FAQ
-**Q:** Some files like .jpg converts itself to .png randomly, why?
-**A:** I don't really know but it didn't bother me.
+## Usage
+1. Open any Gmail thread that contains attachments.
+2. Click the download button that appears next to the built-in Drive actions.
+3. Chrome queues individual downloads for every attachment using the original filenames. Check DevTools for warnings about Drive files that require manual retrieval.
 
-## 📃 License
-This project is released under the MIT License.
+## Manifest Notes
+- Manifest V3 now ships with an inline description and author credit, removing the need for locale message bundles.
+- Background downloads return explicit success or error responses, keeping the message channel stable during bulk transfers.
+- Extension version bumped to **1.0.1** to track the latest styling and manifest updates.
+
+## Recent Updates
+- Rebranded the project and extension as **Gmail Bulk Attachments Downloader** with refreshed toolbar icons.
+- Ensured every attachment download depends on InboxSDK getDownloadURL() before touching the DOM.
+- Added URL normalisation, filename sanitisation, and DOM fallbacks to avoid JPEG/WebP proxy downloads.
+- Logged informative warnings when Gmail withholds a Drive URL so you can connect a Gmail or Drive API fallback if needed.
+- Normalised the toolbar icon CSS so the download button aligns with Gmail's native Drive action.
+
+## License
+This project is released under the MIT License. See [LICENSE](LICENSE) for details.
+
+## Author
+Katsopolis

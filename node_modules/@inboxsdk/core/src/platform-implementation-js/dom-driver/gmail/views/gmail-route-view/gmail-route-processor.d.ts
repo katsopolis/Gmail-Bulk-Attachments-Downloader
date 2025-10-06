@@ -1,0 +1,70 @@
+export default class GmailRouteProcessor {
+    _routeNameToRouteIDMap: Record<string, string>;
+    _routeNameToRouteIDMaps: Record<string, string>;
+    _compatibleRouteIDMap: Record<string, string>;
+    constructor();
+    NativeRouteIDs: Readonly<{
+        INBOX: "inbox/:page";
+        ALL_MAIL: "all/:page";
+        SENT: "sent/:page";
+        STARRED: "starred/:page";
+        DRAFTS: "drafts/:page";
+        SNOOZED: "snoozed/:page";
+        DONE: "done";
+        REMINDERS: "reminders";
+        LABEL: "label/:labelName/:page";
+        TRASH: "trash/:page";
+        SPAM: "spam/:page";
+        IMPORTANT: "imp/:page";
+        SEARCH: "search/:query/:page";
+        THREAD: "inbox/:threadID";
+        CHATS: "chats/:page";
+        CHAT: "chats/:chatID";
+        CONTACTS: "contacts/:page";
+        CONTACT: "contacts/:contactID";
+        SETTINGS: "settings/:section";
+        SCHEDULED: "scheduled";
+        CHAT_WELCOME: "chat/welcome";
+        CHAT_DM: "chat/dm/:chatID";
+        SPACES_WELCOME: "rooms/welcome";
+        SPACE: "chat/space/:spaceID";
+        MEET: "calls";
+        ANY_LIST: "*";
+    }>;
+    NativeListRouteIDs: Readonly<{
+        INBOX: "inbox/:page";
+        ALL_MAIL: "all/:page";
+        SENT: "sent/:page";
+        STARRED: "starred/:page";
+        DRAFTS: "drafts/:page";
+        SNOOZED: "snoozed/:page";
+        DONE: "done";
+        REMINDERS: "reminders";
+        LABEL: "label/:labelName/:page";
+        TRASH: "trash/:page";
+        SPAM: "spam/:page";
+        IMPORTANT: "imp/:page";
+        SEARCH: "search/:query/:page";
+        ANY_LIST: "*";
+    }>;
+    RouteTypes: Readonly<{
+        LIST: "LIST";
+        THREAD: "THREAD";
+        SETTINGS: "SETTINGS";
+        CHAT: "CHAT";
+        SPACE: "SPACE";
+        MEET: "MEET";
+        CUSTOM: "CUSTOM";
+        UNKNOWN: "UNKNOWN";
+    }>;
+    isListRouteName(routeName: string): boolean;
+    isSettingsRouteName(routeName: string): boolean;
+    isContactRouteName(routeName: string): boolean;
+    getRouteID(routeName: string): string | null;
+    getRouteName(routeID: string): string | null;
+    isNativeRoute(routeName: string): boolean;
+    getCompatibleRouteID(routeID: string): string;
+    _setupRouteNameToRouteIDMap(): void;
+    _setupCompatibleRouteIDMap(): void;
+}
+//# sourceMappingURL=gmail-route-processor.d.ts.map

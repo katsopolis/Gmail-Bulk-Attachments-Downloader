@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "Gmail - Attachments Downloader",
-  "short_name": "AttachmentsDownloade",
-  "description": "__MSG_description__",
-  "version": "0.8",
-  "default_locale": "en",
+  "name": "Gmail Bulk Attachments Downloader",
+  "short_name": "Bulk Attach",
+  "description": "Download every Gmail attachment with one click while keeping original filenames and formats intact.",
+  "version": "1.0.1",
+  "author": "Katsopolis",
   "icons": {
     "16": "img/logo_16.png",
     "48": "img/logo_48.png",
@@ -18,7 +18,8 @@
   "host_permissions": [
     "https://mail.google.com/",
     "https://inbox.google.com/",
-    "https://www.google-analytics.com/"
+    "https://www.google-analytics.com/",
+    "https://mail-attachment.googleusercontent.com/*"
   ],
   "background": {
     "service_worker": "background.js"

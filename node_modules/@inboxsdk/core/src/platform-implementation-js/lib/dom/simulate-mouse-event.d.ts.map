@@ -1,0 +1,1 @@
+{"version":3,"file":"simulate-mouse-event.d.ts","sourceRoot":"","sources":["../../../../../../src/platform-implementation-js/lib/dom/simulate-mouse-event.ts"],"names":[],"mappings":"AAAA,MAAM,CAAC,OAAO,UAAU,kBAAkB,CACxC,OAAO,EAAE,WAAW,EACpB,cAAc,EAAE,MAAM,QAqBvB;AAED,wBAAgB,aAAa,CAAC,OAAO,EAAE,WAAW,QAEjD;AAED,wBAAgB,aAAa,CAAC,OAAO,EAAE,WAAW,QAOjD"}

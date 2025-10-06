@@ -1,0 +1,1 @@
+{"version":3,"file":"message-metadata-holder.d.ts","sourceRoot":"","sources":["../../../../src/injected-js/message-metadata-holder.ts"],"names":[],"mappings":"AACA,OAAO,KAAK,EAAE,OAAO,EAAE,MAAM,yEAAyE,CAAC;AAMvG,wBAAgB,KAAK,SAgBpB;AA6DD,wBAAgB,GAAG,CACjB,eAAe,EAAE,KAAK,CAAC;IACrB,QAAQ,EAAE,MAAM,CAAC;IACjB,QAAQ,EAAE,OAAO,EAAE,CAAC;CACrB,CAAC,QAKH"}

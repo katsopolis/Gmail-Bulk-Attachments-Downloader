@@ -1,0 +1,1 @@
+{"version":3,"file":"keyboard-shortcut-handle.d.ts","sourceRoot":"","sources":["../../../../../src/platform-implementation-js/views/keyboard-shortcut-handle.ts"],"names":[],"mappings":"AAAA,OAAO,YAAY,MAAM,2BAA2B,CAAC;AAErD,MAAM,CAAC,OAAO,OAAO,sBAAuB,SAAQ,YAAY;IAC9D,KAAK,EAAE,MAAM,CAAC;IACd,WAAW,EAAE,MAAM,CAAC;gBAER,KAAK,EAAE,MAAM,EAAE,WAAW,EAAE,MAAM;IAM9C,MAAM;CAGP"}

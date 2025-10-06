@@ -1,0 +1,41 @@
+import * as Kefir from 'kefir';
+import type { Bus } from 'kefir-bus';
+import GmailToolbarView from './gmail-toolbar-view';
+import GmailThreadRowView from './gmail-thread-row-view';
+import type GmailDriver from '../gmail-driver';
+import type GmailRouteView from './gmail-route-view/gmail-route-view';
+declare class GmailRowListView {
+    _element: HTMLElement;
+    _gmailDriver: GmailDriver;
+    _routeViewDriver: GmailRouteView;
+    _pendingExpansions: Map<string, number>;
+    _pendingExpansionsSignal: Bus<any, unknown>;
+    _toolbarView: GmailToolbarView | null | undefined;
+    _threadRowViewDrivers: Set<GmailThreadRowView>;
+    _eventStreamBus: Bus<any, unknown>;
+    _rowViewDriverStream: Kefir.Observable<GmailThreadRowView, unknown>;
+    _stopper: Kefir.Observable<any, unknown>;
+    _elementsToViews: Map<HTMLElement, GmailThreadRowView>;
+    _selectionMutationObserver: MutationObserver;
+    _selectedThreadRowViews: Set<GmailThreadRowView>;
+    constructor(rootElement: HTMLElement, routeViewDriver: GmailRouteView, gmailDriver: GmailDriver);
+    destroy(): void;
+    getElement(): HTMLElement;
+    getRouteViewDriver(): GmailRouteView;
+    getToolbarView(): GmailToolbarView | null | undefined;
+    getSelectedThreadRowViewDrivers(): Set<GmailThreadRowView>;
+    getThreadRowViewDrivers(): Set<GmailThreadRowView>;
+    getRowViewDriverStream(): Kefir.Observable<GmailThreadRowView, unknown>;
+    getEventStream(): Bus<any, unknown>;
+    _setupToolbarView(): void;
+    _findToolbarElement(): HTMLElement | null;
+    _fixColumnWidths(newTableParent: HTMLElement | null | undefined): void;
+    expandColumn(colSelector: string, width: number): void;
+    _expandColumnJob(): void;
+    _batchedSignalThreadRowViewSelectionChangeScheduled: boolean;
+    _batchedSignalThreadRowViewSelectionChange(): void;
+    _startWatchingForRowViews(): void;
+    _addThreadRowView(gmailThreadRowView: GmailThreadRowView): void;
+}
+export default GmailRowListView;
+//# sourceMappingURL=gmail-row-list-view.d.ts.map

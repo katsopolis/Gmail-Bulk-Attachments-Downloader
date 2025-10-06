@@ -1,0 +1,2 @@
+export default function getInsertBeforeElement(checkElement: HTMLElement, childElements: ArrayLike<any>, dataAttributes: string[]): HTMLElement | null;
+//# sourceMappingURL=get-insert-before-element.d.ts.map

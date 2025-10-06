@@ -1,0 +1,1 @@
+{"version":3,"file":"make-mutation-observer-stream.d.ts","sourceRoot":"","sources":["../../../../../../src/platform-implementation-js/lib/dom/make-mutation-observer-stream.ts"],"names":[],"mappings":"AAAA,OAAO,KAAK,KAAK,MAAM,OAAO,CAAC;AAI/B,MAAM,CAAC,OAAO,UAAU,0BAA0B,CAChD,OAAO,EAAE,WAAW,EACpB,OAAO,EAAE,oBAAoB,GAC5B,KAAK,CAAC,UAAU,CAAC,cAAc,EAAE,KAAK,CAAC,CAEzC"}

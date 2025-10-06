@@ -1,0 +1,1 @@
+{"version":3,"file":"safe-event-emitter.d.ts","sourceRoot":"","sources":["../../../../../src/platform-implementation-js/lib/safe-event-emitter.ts"],"names":[],"mappings":";AAAA,OAAO,YAAY,MAAM,QAAQ,CAAC;AAOlC,MAAM,CAAC,OAAO,OAAO,gBAAiB,SAAQ,YAAY;IACxD,IAAI,CAAC,MAAM,EAAE,MAAM,EAAE,GAAG,KAAK,EAAE,KAAK,CAAC,GAAG,CAAC,GAAG,OAAO;CAQpD"}

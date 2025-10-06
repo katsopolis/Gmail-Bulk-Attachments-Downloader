@@ -1,169 +1,122 @@
-// InboxSDK'yi yükle
-Promise.all([
-  InboxSDK.load('2.0', 'sdk_mlazzje-dlgmail_43a7d41655')
-])
-.then(function(results){
-  var sdk = results[0];
-
-  if (!sdk) {
-    throw new Error('InboxSDK başlatılamadı');
-  }
-
-  var registerHandler = function() {
-    try {
-      sdk.Conversations.registerMessageViewHandler(messageViewHandler);
-    } catch (error) {
-      console.error('MessageViewHandler kaydı başarısız:', error);
+﻿(function initializeExtension() {
+  const start = () => {
+    if (typeof InboxSDK === 'undefined' || typeof InboxSDK.load !== 'function') {
+      setTimeout(start, 200);
+      return;
     }
-  };
 
-  var messageViewHandler = function(messageView) {
-    try {
-      if(messageView && messageView.isLoaded()) {
-        addCustomAttachmentsToolbarButton(messageView);
-      }
-    } catch (error) {
-      console.error('MessageView işleme hatası:', error);
-    }
-  };
-
-  var addCustomAttachmentsToolbarButton = function(messageView) {
-    try {
-      var options = {
-        tooltip: chrome.i18n.getMessage('tooltip'),
-        iconUrl: chrome.runtime.getURL('img/save.png'),
-        onClick: handleAttachmentsButtonClick
-      };
-
-      messageView.addAttachmentsToolbarButton(options);
-    } catch (error) {
-      console.error('Buton ekleme hatası:', error);
-    }
-  };
-
-  var handleAttachmentsButtonClick = function(event) {
-    try {
-      if (!event || !event.attachmentCardViews) {
-        throw new Error('Geçersiz event veya attachmentCardViews yok');
-      }
-
-      var totalAttachments = event.attachmentCardViews.length;
-      var successfulDownloads = 0;
-      var failedDownloads = 0;
-
-      event.attachmentCardViews.forEach(async function(attachmentCardView, index) {
-        if (typeof attachmentCardView !== 'undefined') {
-          let downloadUrl = null;
-          let downloadMethod = 'unknown';
-          let originalFilename = null;
-
-          // Önce dosya adını almayı dene
-          try {
-            originalFilename = await attachmentCardView.getTitle();
-            console.log(`[Info] Attachment Title (index ${index}):`, originalFilename);
-          } catch (e) {
-            console.warn(`[Info] attachmentCardView.getTitle() hatası veya metot yok (index ${index}):`, e);
-            originalFilename = `attachment_${index}_${Date.now()}.download`; // Hata durumunda varsayılan ad
-          }
-
-          // 1. getDownloadURL dene (TXT gibi dosyalar için çalışabilir)
-          try {
-            const url = await attachmentCardView.getDownloadURL(); 
-            if (url && typeof url === 'string') {
-              downloadUrl = url;
-              downloadMethod = 'getDownloadURL';
-              console.log(`[InboxSDK] Alınan URL (index ${index}):`, downloadUrl);
-            } else {
-              console.log(`[InboxSDK] getDownloadURL null/geçersiz döndü (index ${index}).`);
-            }
-          } catch (e) {
-            console.warn(`[InboxSDK] getDownloadURL hatası (index ${index}):`, e);
-          }
-
-          // 2. Eğer getDownloadURL işe yaramadıysa, DOM'u dene (Resimler için?)
-          if (!downloadUrl) {
-            console.log(`[DOM] getDownloadURL başarısız, DOM deneniyor (index ${index}).`);
-            try {
-              const element = attachmentCardView.getElement();
-              if (element) {
-                // Öncelik sırası: a[download] -> a[href*=".../attachment"] -> img[src]
-                const downloadLink = element.querySelector('a[download][href*="googleusercontent.com"]'); // Tam indirme linki?
-                const imageLink = element.querySelector('a:not([download])[href*="googleusercontent.com/attachment"]'); // Önizleme/dolaylı link?
-                const imageSrc = element.querySelector('img[src*="googleusercontent.com"]'); // Gömülü/thumbnail resim?
-
-                if (downloadLink && downloadLink.href) {
-                  downloadUrl = downloadLink.href;
-                  downloadMethod = 'DOM (a[download])';
-                  console.log(`[DOM] URL bulundu (a[download]) (index ${index}):`, downloadUrl);
-                } else if (imageLink && imageLink.href) {
-                  downloadUrl = imageLink.href;
-                  downloadMethod = 'DOM (a[href])';
-                  console.log(`[DOM] URL bulundu (a[href]) (index ${index}):`, downloadUrl);
-                } else if (imageSrc && imageSrc.src) {
-                  // Son çare: thumbnail URL, temizlemeyi dene
-                  const cleanedUrl = removeUrlImageParameters(imageSrc.src);
-                  downloadUrl = cleanedUrl;
-                  downloadMethod = 'DOM (img[src] cleaned)';
-                  console.log(`[DOM] URL bulundu (img[src] - Temizlendi) (index ${index}):`, downloadUrl);
-                } else {
-                  console.warn(`[DOM] Element bulundu ama uygun link/src bulunamadı (index ${index}). Element:`, element);
-                }
-              } else {
-                console.warn(`[DOM] attachmentCardView.getElement() başarısız (index ${index}).`);
-              }
-            } catch (e) {
-              console.error(`[DOM] Element alma/işleme hatası (index ${index}):`, e);
-            }
-          }
-
-          // 3. İndirme işlemini yap (eğer bir URL bulunduysa ve dosya adı varsa)
-          if (downloadUrl && typeof downloadUrl === 'string' && originalFilename) {
-            console.log(`[Download] İndirme deneniyor (index ${index}, method: ${downloadMethod}, filename: ${originalFilename}, url: ${downloadUrl})`);
-            downloadAttachment(downloadUrl, originalFilename,
-              function() { // Başarı callback'i
-                successfulDownloads++;
-                console.log(`İndirme isteği gönderildi (index ${index}, method: ${downloadMethod})`);
-                 if (successfulDownloads + failedDownloads === totalAttachments) {
-                   console.log('Tüm indirme istekleri gönderildi. Başarılı:', successfulDownloads, 'Başarısız:', failedDownloads);
-                 }
-              },
-              function(error) { // downloadAttachment hata callback'i
-                failedDownloads++;
-                console.error(`downloadAttachment hazırlama/gönderme hatası (index ${index}, method: ${downloadMethod}):`, error);
-                 if (successfulDownloads + failedDownloads === totalAttachments) {
-                   console.log('Tüm indirme istekleri gönderildi (hatalarla). Başarılı:', successfulDownloads, 'Başarısız:', failedDownloads);
-                 }
-              }
-            );
-          } else { // URL veya dosya adı bulunamadı
-            failedDownloads++;
-            console.error(`İndirilecek URL veya dosya adı bulunamadı (index ${index}). URL: ${downloadUrl}, Filename: ${originalFilename}`);
-             if (successfulDownloads + failedDownloads === totalAttachments) {
-               console.log('Tüm indirme istekleri gönderildi (URL/Filename bulunamayanlarla). Başarılı:', successfulDownloads, 'Başarısız:', failedDownloads);
-             }
-          }
-
-        } else {
-           console.warn('Undefined attachmentCardView (index ' + index + ')');
-           failedDownloads++;
-           if (successfulDownloads + failedDownloads === totalAttachments) {
-                console.log('Tüm indirme istekleri gönderildi (tanımsız eklerle). Başarılı:', successfulDownloads, 'Başarısız:', failedDownloads);
-           }
+    InboxSDK.load(2, 'sdk_mlazzje-dlgmail_43a7d41655', {
+      appName: 'Gmail Attachments Downloader',
+      globalErrorLogging: false,
+      eventTracking: false
+    })
+      .then((sdk) => {
+        if (!sdk) {
+          throw new Error('InboxSDK could not be initialised');
         }
-      }); // End forEach
-    } catch (error) {
-      console.error('İndirme işlemi hatası:', error);
-    }
-  };
 
-  // Başlat
-  registerHandler();
-})
-.catch(function(error) {
-  console.error('InboxSDK initialization failed:', error);
-  // Hata durumunda kullanıcıya bilgi ver
-  chrome.runtime.sendMessage({
-    type: 'error',
-    message: 'Eklenti başlatılamadı: ' + error.message
-  });
-});
+        const handleAttachmentsButtonClick = async (event) => {
+          const views = event?.attachmentCardViews;
+          if (!Array.isArray(views) || views.length === 0) {
+            console.error('No attachments available for download.');
+            return;
+          }
+
+          const tasks = views.map(async (attachmentCardView, index) => {
+            if (!attachmentCardView) {
+              throw new Error(`AttachmentCardView missing (index ${index}).`);
+            }
+
+            let originalFilename;
+            try {
+              originalFilename = await attachmentCardView.getTitle();
+            } catch (error) {
+              console.warn(`Could not read filename (index ${index}):`, error);
+              originalFilename = `attachment_${index}_${Date.now()}.download`;
+            }
+
+            let downloadUrl = null;
+            try {
+              const directUrl = await attachmentCardView.getDownloadURL();
+              if (typeof directUrl === 'string' && directUrl.length > 0) {
+                downloadUrl = directUrl;
+              }
+            } catch (error) {
+              console.warn(`getDownloadURL failed (index ${index}):`, error);
+            }
+
+            if (!downloadUrl) {
+              try {
+                const element = attachmentCardView.getElement();
+                if (element) {
+                  const downloadLink = element.querySelector('a[download][href*="googleusercontent.com"]');
+                  const imageLink = element.querySelector('a:not([download])[href*="googleusercontent.com/attachment"]');
+                  const imageSrc = element.querySelector('img[src*="googleusercontent.com"]');
+
+                  if (downloadLink?.href) {
+                    downloadUrl = downloadLink.href;
+                  } else if (imageLink?.href) {
+                    downloadUrl = imageLink.href;
+                  } else if (imageSrc?.src) {
+                    downloadUrl = removeUrlImageParameters(imageSrc.src);
+                  }
+                }
+              } catch (error) {
+                console.error(`Failed to read attachment URL from DOM (index ${index}):`, error);
+              }
+            }
+
+            if (!downloadUrl) {
+              throw new Error(`No download URL found (index ${index}).`);
+            }
+
+            return new Promise((resolve, reject) => {
+              downloadAttachment(
+                downloadUrl,
+                originalFilename,
+                () => resolve({ status: 'success', index }),
+                (error) => reject(new Error(`Download failed (index ${index}): ${error.message}`))
+              );
+            });
+          });
+
+          const results = await Promise.allSettled(tasks);
+          results
+            .filter((result) => result.status === 'rejected')
+            .forEach((result) => console.error(result.reason));
+        };
+
+        const addCustomAttachmentsToolbarButton = (messageView) => {
+          try {
+            messageView.addAttachmentsToolbarButton({
+              tooltip: 'Download all',
+              iconUrl: chrome.runtime.getURL('img/save.png'),
+              onClick: handleAttachmentsButtonClick
+            });
+          } catch (error) {
+            console.error('Failed to add attachments toolbar button:', error);
+          }
+        };
+
+        const messageViewHandler = (messageView) => {
+          try {
+            if (messageView?.isLoaded()) {
+              addCustomAttachmentsToolbarButton(messageView);
+            }
+          } catch (error) {
+            console.error('Failed to process message view:', error);
+          }
+        };
+
+        sdk.Conversations.registerMessageViewHandler(messageViewHandler);
+      })
+      .catch((error) => {
+        console.error('InboxSDK initialization failed:', error);
+        chrome.runtime.sendMessage({
+          type: 'error',
+          message: 'Extension failed to start: ' + error.message
+        });
+      });
+  };
+  start();
+})();
