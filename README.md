@@ -13,7 +13,7 @@ Gmail Bulk Attachments Downloader adds a toolbar button that downloads every att
 ## Preview
 Below is the toolbar button added by the extension:
 
-![Toolbar button](img/logo_128-revert.png)
+![Toolbar button](img/screenshot1.png)
 
 ## Installation
 1. Download or clone this repository (GmailBulkAttachmentsDownload).
