@@ -1,6 +1,6 @@
 ﻿# Gmail Bulk Attachments Downloader
 
-![Extension logo](img/logo_128.png)
+![Extension logo](img/logo_128-revert.png)
 
 Gmail Bulk Attachments Downloader adds a toolbar button that downloads every attachment in the open Gmail conversation with a single click, preserving each file's original name, format, and size.
 
@@ -13,7 +13,7 @@ Gmail Bulk Attachments Downloader adds a toolbar button that downloads every att
 ## Preview
 Below is the toolbar button added by the extension:
 
-![Toolbar button](img/save.png)
+![Toolbar button](img/logo_128-revert.png)
 
 ## Installation
 1. Download or clone this repository (GmailBulkAttachmentsDownload).
