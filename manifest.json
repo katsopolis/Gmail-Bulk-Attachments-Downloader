@@ -3,7 +3,7 @@
   "name": "Gmail Bulk Attachments Downloader",
   "short_name": "Bulk Attach",
   "description": "Download every Gmail attachment with one click while keeping original filenames and formats intact.",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "author": "Katsopolis",
   "icons": {
     "16": "img/logo_16.png",
