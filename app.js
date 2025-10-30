@@ -1,4 +1,24 @@
 ﻿(function initializeExtension() {
+  // Suppress InboxSDK non-critical errors
+  const originalError = console.error;
+  console.error = function(...args) {
+    const message = args[0]?.toString() || '';
+
+    // Filter out known InboxSDK internal errors that don't affect functionality
+    const suppressedPatterns = [
+      /pubsub\.googleapis\.com/i,
+      /apparently already expired token/i,
+      /assuming our clock is busted/i,
+      /Failed to load.*googleapis\.com/i
+    ];
+
+    const shouldSuppress = suppressedPatterns.some(pattern => pattern.test(message));
+
+    if (!shouldSuppress) {
+      originalError.apply(console, args);
+    }
+  };
+
   const start = () => {
     if (typeof InboxSDK === 'undefined' || typeof InboxSDK.load !== 'function') {
       setTimeout(start, 200);
@@ -8,7 +28,9 @@
     InboxSDK.load(2, 'sdk_mlazzje-dlgmail_43a7d41655', {
       appName: 'Gmail Attachments Downloader',
       globalErrorLogging: false,
-      eventTracking: false
+      eventTracking: false,
+      suppressAddonTitle: true,
+      suppressThreadRowGapFix: true
     })
       .then((sdk) => {
         if (!sdk) {
