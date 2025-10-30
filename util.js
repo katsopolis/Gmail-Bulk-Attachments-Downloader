@@ -99,15 +99,32 @@ function removeUrlImageParameters(url) {
   try {
     let cleanedUrl = url;
 
-    // Remove image sizing parameters (=s, =w, =h)
+    // Remove ALL image sizing parameters - be very aggressive
     const sizePatterns = [
+      // Path-based parameters (at end of URL)
       /(=s\d+(?:-[a-z0-9]+)*)$/i,
       /(=w\d+(?:-h\d+)?(?:-[a-z0-9]+)*)$/i,
       /(=h\d+(?:-w\d+)?(?:-[a-z0-9]+)*)$/i,
+      /(-s\d+(?:-[a-z0-9]+)*)$/i,
+      /(-w\d+(?:-h\d+)?(?:-[a-z0-9]+)*)$/i,
+
+      // Query string parameters
       /([?&])sz=\d+/gi,
       /([?&])s=\d+/gi,
       /([?&])w=\d+/gi,
-      /([?&])h=\d+/gi
+      /([?&])h=\d+/gi,
+      /([?&])size=\d+/gi,
+      /([?&])width=\d+/gi,
+      /([?&])height=\d+/gi,
+
+      // Display/format parameters
+      /([?&])disp=inline/gi,
+      /([?&])format=[^&]*/gi,
+
+      // Any path segment that looks like a size parameter
+      /\/s\d+[^\/]*/gi,
+      /\/w\d+[^\/]*/gi,
+      /\/h\d+[^\/]*/gi
     ];
 
     for (const pattern of sizePatterns) {
@@ -120,6 +137,11 @@ function removeUrlImageParameters(url) {
     // Remove double separators
     cleanedUrl = cleanedUrl.replace(/&{2,}/g, '&');
     cleanedUrl = cleanedUrl.replace(/\?&/g, '?');
+
+    // Remove duplicate slashes (but keep //)
+    cleanedUrl = cleanedUrl.replace(/([^:])\/\//g, '$1/');
+
+    console.log(`URL cleaning: ${url.substring(0, 80)}... => ${cleanedUrl.substring(0, 80)}...`);
 
     return cleanedUrl;
   } catch (error) {
