@@ -23,36 +23,47 @@ function sanitizeFilename(filename, fallbackBase) {
   return cleaned;
 }
 
-function downloadAttachment(url, filename, onSuccess, onError) {
+function downloadAttachment(url, filename, metadata, onSuccess, onError) {
   try {
     if (!url) {
-      throw new Error('URL parametresi gerekli');
+      throw new Error('URL parameter is required');
     }
 
     const safeFilename = sanitizeFilename(filename || '', 'attachment');
     const stripped = stripUrl(url) || url;
+
+    // Log metadata for debugging
+    if (metadata) {
+      console.log(`Downloading: ${safeFilename}`, {
+        expectedSize: metadata.size || 'unknown',
+        expectedType: metadata.type || 'unknown',
+        attachmentType: metadata.attachmentType || 'unknown',
+        url: stripped.substring(0, 100) + '...'
+      });
+    }
 
     chrome.runtime.sendMessage(
       {
         type: 'downloadAttachment',
         payload: {
           url: stripped,
-          filename: safeFilename
+          filename: safeFilename,
+          metadata: metadata || null
         }
       },
       (response) => {
         if (chrome.runtime.lastError) {
-          console.error('Mesaj g├Ânderilemedi:', chrome.runtime.lastError);
+          console.error('Failed to send message to background:', chrome.runtime.lastError);
           if (typeof onError === 'function') {
-            onError(new Error(chrome.runtime.lastError.message || 'Mesaj g├Ânderilemedi'));
+            onError(new Error(chrome.runtime.lastError.message || 'Failed to send message'));
           }
           return;
         }
 
         if (response?.status === 'error') {
-          console.error('Arka plan indirme hatas─▒:', response.message);
+          console.error('Background download error:', response.message);
           if (typeof onError === 'function') {
-            onError(new Error(response.message || '─░ndirme tamamlanamad─▒'));
+            onError(new Error(response.message || 'Download could not be completed'));
           }
           return;
         }
@@ -63,7 +74,7 @@ function downloadAttachment(url, filename, onSuccess, onError) {
       }
     );
   } catch (error) {
-    console.error('─░ndirme i┼şlemi haz─▒rlama hatas─▒:', error);
+    console.error('Download preparation error:', error);
     if (typeof onError === 'function') {
       onError(error);
     }
@@ -86,21 +97,33 @@ function removeUrlImageParameters(url) {
   }
 
   try {
-    const patterns = [
+    let cleanedUrl = url;
+
+    // Remove image sizing parameters (=s, =w, =h)
+    const sizePatterns = [
       /(=s\d+(?:-[a-z0-9]+)*)$/i,
       /(=w\d+(?:-h\d+)?(?:-[a-z0-9]+)*)$/i,
-      /(=h\d+(?:-w\d+)?(?:-[a-z0-9]+)*)$/i
+      /(=h\d+(?:-w\d+)?(?:-[a-z0-9]+)*)$/i,
+      /([?&])sz=\d+/gi,
+      /([?&])s=\d+/gi,
+      /([?&])w=\d+/gi,
+      /([?&])h=\d+/gi
     ];
 
-    for (const pattern of patterns) {
-      if (pattern.test(url)) {
-        return url.replace(pattern, '');
-      }
+    for (const pattern of sizePatterns) {
+      cleanedUrl = cleanedUrl.replace(pattern, '');
     }
 
-    return url;
+    // Remove trailing parameter separators
+    cleanedUrl = cleanedUrl.replace(/[?&]$/, '');
+
+    // Remove double separators
+    cleanedUrl = cleanedUrl.replace(/&{2,}/g, '&');
+    cleanedUrl = cleanedUrl.replace(/\?&/g, '?');
+
+    return cleanedUrl;
   } catch (error) {
-    console.error('URL temizlenemedi:', url, error);
+    console.error('Failed to clean URL:', url, error);
   }
 
   return url;

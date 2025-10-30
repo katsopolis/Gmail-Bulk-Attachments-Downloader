@@ -31,11 +31,38 @@ Below is the toolbar button added by the extension:
 - Extension version bumped to **1.0.1** to track the latest styling and manifest updates.
 
 ## Recent Updates
+
+### Version 1.0.2 - Performance & Analysis Optimization (Latest)
+- **Metadata Extraction**: Now extracts and logs file size, MIME type, and attachment type for each download
+- **URL Validation**: Detects and warns about proxy/thumbnail URLs that may differ from original files
+- **Enhanced URL Cleaning**: Improved parameter removal to prevent downloading thumbnails instead of full files
+- **Download Tracking**: Real-time progress monitoring with size verification after download completion
+- **Better Error Handling**: Replaced Turkish error messages with English, added detailed logging throughout
+- **DOM Fallback Improvements**: Prioritized URL extraction logic to prefer original file URLs over thumbnails
+- **File Type Detection**: Infers MIME types from file extensions with support for 30+ common formats
+
+### Previous Updates
 - Rebranded the project and extension as **Gmail Bulk Attachments Downloader** with refreshed toolbar icons.
 - Ensured every attachment download depends on InboxSDK getDownloadURL() before touching the DOM.
 - Added URL normalisation, filename sanitisation, and DOM fallbacks to avoid JPEG/WebP proxy downloads.
 - Logged informative warnings when Gmail withholds a Drive URL so you can connect a Gmail or Drive API fallback if needed.
 - Normalised the toolbar icon CSS so the download button aligns with Gmail's native Drive action.
+
+## Technical Improvements
+
+### File Size & Type Accuracy
+The extension now addresses the common issue where downloaded files differ from Gmail's attachment metadata:
+- Extracts file size from attachment card DOM elements
+- Infers MIME types from file extensions
+- Logs expected vs actual file sizes after download
+- Warns when URLs may point to thumbnails or proxies instead of original files
+
+### URL Quality Detection
+The extension validates download URLs and warns about potential issues:
+- Detects image sizing parameters (=s, =w, =h, sz=)
+- Identifies proxy indicators (&disp=inline)
+- Prioritizes mail-attachment.googleusercontent.com URLs over image proxies
+- Enhanced parameter stripping to ensure original file download
 
 ## License
 This project is released under the MIT License. See [LICENSE](LICENSE) for details.
