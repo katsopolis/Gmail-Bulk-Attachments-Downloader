@@ -107,7 +107,8 @@
             filename: null,
             type: null,
             size: null,
-            attachmentType: null
+            attachmentType: null,
+            isDriveFile: false
           };
 
           try {
@@ -126,6 +127,12 @@
           try {
             const element = attachmentCardView.getElement();
             if (element) {
+              // Check if this is a Drive file
+              const driveLink = element.querySelector('a[href*="drive.google.com"]');
+              if (driveLink) {
+                metadata.isDriveFile = true;
+                console.log(`[Attachment ${index}] Detected as Google Drive file`);
+              }
               // Try multiple methods to extract file size from DOM
               const sizeSelectors = [
                 '.aZo span',           // Common Gmail attachment size container
@@ -156,10 +163,14 @@
 
               // If no size found, log for debugging
               if (!metadata.size) {
-                console.warn(`[Attachment ${index}] Could not extract file size from DOM`);
-                // Log all text content for debugging
-                const allText = element.textContent.substring(0, 200);
-                console.log(`[Attachment ${index}] Element text preview: "${allText}"`);
+                if (metadata.isDriveFile) {
+                  console.log(`[Attachment ${index}] File size not available in DOM (Drive files download with correct size)`);
+                } else {
+                  console.warn(`[Attachment ${index}] Could not extract file size from DOM`);
+                  // Log all text content for debugging
+                  const allText = element.textContent.substring(0, 200);
+                  console.log(`[Attachment ${index}] Element text preview: "${allText}"`);
+                }
               }
 
               // Try to extract MIME type from DOM or filename
@@ -232,88 +243,107 @@
             const download = link.getAttribute('download') || '';
             const hasGoogleusercontent = href.includes('googleusercontent.com');
             const hasMailDomain = href.includes('/mail/');
-            console.log(`[Attachment ${index}] Link ${i}: ${hasGoogleusercontent ? 'googleusercontent' : hasMailDomain ? 'gmail' : 'other'} | download="${download}" | href="${href.substring(0, 120)}"`);
+            const hasDrive = href.includes('drive.google.com');
+            console.log(`[Attachment ${index}] Link ${i}: ${hasDrive ? 'drive' : hasGoogleusercontent ? 'googleusercontent' : hasMailDomain ? 'gmail' : 'other'} | download="${download}" | href="${href.substring(0, 120)}"`);
           });
 
-          // Priority 1: Download link with explicit download attribute
+          // Priority 1: Google Drive links (HIGHEST PRIORITY for Drive-shared attachments)
+          for (const link of allLinks) {
+            if (link.href && link.href.includes('drive.google.com/file/d/')) {
+              // Extract file ID and convert to direct download URL
+              const driveMatch = link.href.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+              if (driveMatch && driveMatch[1]) {
+                const fileId = driveMatch[1];
+                // Convert view URL to direct download URL
+                const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
+                console.log(`[Attachment ${index}] ✓ Method 1 (PRIORITY): Found Google Drive link`);
+                console.log(`[Attachment ${index}]   File ID: ${fileId}`);
+                console.log(`[Attachment ${index}]   View URL: ${link.href.substring(0, 100)}`);
+                console.log(`[Attachment ${index}]   Download URL: ${downloadUrl}`);
+                return downloadUrl;
+              }
+            }
+          }
+
+          // Priority 2: Download link with explicit download attribute
           const downloadLink = element.querySelector('a[download][href*="googleusercontent.com"]');
           if (downloadLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 1: Found download link with download attribute`);
+            console.log(`[Attachment ${index}] ✓ Method 2: Found download link with download attribute`);
             return downloadLink.href;
           }
 
-          // Priority 2: Direct mail-attachment URL
+          // Priority 3: Direct mail-attachment URL
           const attachmentLink = element.querySelector('a[href*="mail-attachment.googleusercontent.com"]');
           if (attachmentLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 2: Found mail-attachment link`);
+            console.log(`[Attachment ${index}] ✓ Method 3: Found mail-attachment link`);
             return attachmentLink.href;
           }
 
-          // Priority 3: Look for redirect URLs that Gmail uses (common pattern)
+          // Priority 4: Look for redirect URLs that Gmail uses (common pattern)
           const redirectLink = element.querySelector('a[href*="/mail/"][href*="view=att"]');
           if (redirectLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 3: Found Gmail attachment view link`);
+            console.log(`[Attachment ${index}] ✓ Method 4: Found Gmail attachment view link`);
             return redirectLink.href;
           }
 
-          // Priority 4: Look for attachment ID in Gmail URL structure
+          // Priority 5: Look for attachment ID in Gmail URL structure
           const gmailAttLink = element.querySelector('a[href*="attid="]');
           if (gmailAttLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 4: Found Gmail link with attid parameter`);
+            console.log(`[Attachment ${index}] ✓ Method 5: Found Gmail link with attid parameter`);
             return gmailAttLink.href;
           }
 
-          // Priority 5: Look for any link that contains "disp=attd" (disposition: attachment)
+          // Priority 6: Look for any link that contains "disp=attd" (disposition: attachment)
           const dispAttLink = element.querySelector('a[href*="disp=attd"]');
           if (dispAttLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 5: Found link with disp=attd`);
+            console.log(`[Attachment ${index}] ✓ Method 6: Found link with disp=attd`);
             return dispAttLink.href;
           }
 
-          // Priority 6: Look for ANY googleusercontent link that's not a thumbnail
+          // Priority 7: Look for ANY googleusercontent link that's not a thumbnail
           for (const link of allLinks) {
             if (link.href && link.href.includes('googleusercontent.com')) {
               const isThumbnail = link.href.includes('=s') || link.href.includes('sz=') ||
                                   link.href.includes('=w') || link.href.includes('=h');
               if (!isThumbnail) {
-                console.log(`[Attachment ${index}] ✓ Method 6: Found googleusercontent link without thumbnail params`);
+                console.log(`[Attachment ${index}] ✓ Method 7: Found googleusercontent link without thumbnail params`);
                 return link.href;
               }
             }
           }
 
-          // Priority 7: Look for ANY Gmail mail link
+          // Priority 8: Look for ANY Gmail mail link
           const gmailLink = element.querySelector('a[href*="/mail/"]');
           if (gmailLink?.href) {
             const href = gmailLink.href;
             if (href.includes('view=') || href.includes('attid=') || href.includes('attach')) {
-              console.log(`[Attachment ${index}] ✓ Method 7: Found Gmail link: ${href.substring(0, 100)}`);
+              console.log(`[Attachment ${index}] ✓ Method 8: Found Gmail link: ${href.substring(0, 100)}`);
               return href;
             }
           }
 
-          // Priority 8: Try to find ANY googleusercontent link and clean it
+          // Priority 9: Try to find ANY googleusercontent link and clean it
           const anyGoogleLink = element.querySelector('a[href*="googleusercontent.com"]');
           if (anyGoogleLink?.href) {
             const cleanedUrl = removeUrlImageParameters(anyGoogleLink.href);
-            console.log(`[Attachment ${index}] ✓ Method 8: Found googleusercontent link, cleaning parameters`);
+            console.log(`[Attachment ${index}] ✓ Method 9: Found googleusercontent link, cleaning parameters`);
             console.log(`[Attachment ${index}]   Original: ${anyGoogleLink.href.substring(0, 100)}`);
             console.log(`[Attachment ${index}]   Cleaned:  ${cleanedUrl.substring(0, 100)}`);
             return cleanedUrl;
           }
 
-          // Priority 9: Check image sources and clean them (last resort)
+          // Priority 10: Check image sources and clean them (last resort)
           for (const img of allImages) {
             if (img.src && img.src.includes('googleusercontent.com')) {
               const cleanedUrl = removeUrlImageParameters(img.src);
-              console.warn(`[Attachment ${index}] ⚠ Method 9 (FALLBACK): Using cleaned image src`);
+              console.warn(`[Attachment ${index}] ⚠ Method 10 (FALLBACK): Using cleaned image src`);
               console.log(`[Attachment ${index}]   Image src: ${img.src.substring(0, 100)}`);
               console.log(`[Attachment ${index}]   Cleaned:   ${cleanedUrl.substring(0, 100)}`);
               return cleanedUrl;
             }
           }
 
-          console.error(`[Attachment ${index}] ✗ No download URL found in DOM after trying all 9 methods`);
+          console.error(`[Attachment ${index}] ✗ No download URL found in DOM after trying all 10 methods`);
           console.error(`[Attachment ${index}] Element classes: ${element.className}`);
           console.error(`[Attachment ${index}] Element HTML preview: ${element.outerHTML.substring(0, 300)}`);
           return null;
@@ -324,10 +354,17 @@
           const result = {
             isProxy: false,
             isThumbnail: false,
-            hasParameters: false
+            hasParameters: false,
+            isDrive: false
           };
 
           if (!url) return result;
+
+          // Check if it's a Drive URL (these are always valid)
+          if (url.includes('drive.google.com/uc?export=download')) {
+            result.isDrive = true;
+            return result; // Drive URLs are always good, skip other checks
+          }
 
           // Check for thumbnail/proxy indicators
           if (url.includes('=s') || url.includes('=w') || url.includes('=h')) {
@@ -392,8 +429,10 @@
 
             // Validate URL quality
             const urlQuality = validateDownloadUrl(downloadUrl);
-            if (urlQuality.isProxy || urlQuality.isThumbnail) {
-              console.warn(`Attachment ${index + 1} URL may be a ${urlQuality.isProxy ? 'proxy' : 'thumbnail'}. File may differ from original.`);
+            if (urlQuality.isDrive) {
+              console.log(`[Attachment ${index + 1}] ✓ Using Google Drive direct download URL`);
+            } else if (urlQuality.isProxy || urlQuality.isThumbnail) {
+              console.warn(`[Attachment ${index + 1}] ⚠ URL may be a ${urlQuality.isProxy ? 'proxy' : 'thumbnail'}. File may differ from original.`);
             }
 
             return new Promise((resolve, reject) => {
