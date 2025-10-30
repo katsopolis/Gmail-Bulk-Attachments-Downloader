@@ -67,42 +67,37 @@
         };
 
         // Helper function to retry getting download URL with delay
-        const getDownloadURLWithRetry = async (attachmentCardView, index, maxRetries = 3) => {
+        const getDownloadURLWithRetry = async (attachmentCardView, index, maxRetries = 1) => {
           // First, try to trigger URL generation
           await triggerAttachmentUrlGeneration(attachmentCardView, index);
 
           for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-              console.log(`[Attachment ${index}] Attempt ${attempt}/${maxRetries} to get download URL...`);
+              console.log(`[Attachment ${index}] Attempt ${attempt}/${maxRetries} to get download URL from InboxSDK...`);
 
               const url = await attachmentCardView.getDownloadURL();
 
               if (url && typeof url === 'string' && url.length > 0) {
                 // Verify it's not a thumbnail URL
                 if (url.includes('=s') || url.includes('sz=')) {
-                  console.warn(`[Attachment ${index}] InboxSDK returned thumbnail URL, will retry...`);
-                  if (attempt < maxRetries) {
-                    await new Promise(resolve => setTimeout(resolve, 500 * attempt));
-                    continue;
-                  }
+                  console.warn(`[Attachment ${index}] InboxSDK returned thumbnail URL, switching to DOM extraction...`);
+                  break; // Don't retry, go to DOM extraction
                 }
                 console.log(`[Attachment ${index}] ✓ Successfully got download URL from InboxSDK`);
                 return url;
               }
 
-              console.warn(`[Attachment ${index}] getDownloadURL returned empty/null, retrying...`);
+              console.warn(`[Attachment ${index}] InboxSDK getDownloadURL returned empty/null`);
             } catch (error) {
-              console.warn(`[Attachment ${index}] getDownloadURL attempt ${attempt} failed:`, error.message);
+              console.warn(`[Attachment ${index}] InboxSDK getDownloadURL failed:`, error.message);
             }
 
             if (attempt < maxRetries) {
-              // Try triggering again before next retry
-              await triggerAttachmentUrlGeneration(attachmentCardView, index);
-              await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+              await new Promise(resolve => setTimeout(resolve, 300));
             }
           }
 
-          console.error(`[Attachment ${index}] ✗ All ${maxRetries} attempts to get download URL failed`);
+          console.log(`[Attachment ${index}] InboxSDK method failed, will use DOM extraction fallback`);
           return null;
         };
 
@@ -131,13 +126,40 @@
           try {
             const element = attachmentCardView.getElement();
             if (element) {
-              // Try to extract file size from DOM
-              const sizeElement = element.querySelector('.aZo span, .aQw span, [role="link"] span');
-              if (sizeElement && sizeElement.textContent) {
-                const sizeMatch = sizeElement.textContent.match(/\(([^)]+)\)|\s+([\d.]+\s*[KMGT]B)/i);
-                if (sizeMatch) {
-                  metadata.size = sizeMatch[1] || sizeMatch[2];
+              // Try multiple methods to extract file size from DOM
+              const sizeSelectors = [
+                '.aZo span',           // Common Gmail attachment size container
+                '.aQw span',           // Alternative Gmail attachment size
+                '[role="link"] span',  // Link spans that might contain size
+                '.aQw',                // Direct size container
+                '.aZo',                // Alternative direct container
+                'span[title]',         // Spans with title attributes
+                'div[aria-label] span' // Divs with aria labels
+              ];
+
+              for (const selector of sizeSelectors) {
+                const sizeElements = element.querySelectorAll(selector);
+                for (const sizeElement of sizeElements) {
+                  if (sizeElement && sizeElement.textContent) {
+                    const text = sizeElement.textContent.trim();
+                    // Match patterns like "(1.5 MB)", "1.5 MB", "1.5MB", "1.5 KB", etc.
+                    const sizeMatch = text.match(/\(?(\d+\.?\d*\s*[KMGT]?B)\)?/i);
+                    if (sizeMatch) {
+                      metadata.size = sizeMatch[1].trim();
+                      console.log(`[Attachment ${index}] Found size: ${metadata.size} in element with selector: ${selector}`);
+                      break;
+                    }
+                  }
                 }
+                if (metadata.size) break;
+              }
+
+              // If no size found, log for debugging
+              if (!metadata.size) {
+                console.warn(`[Attachment ${index}] Could not extract file size from DOM`);
+                // Log all text content for debugging
+                const allText = element.textContent.substring(0, 200);
+                console.log(`[Attachment ${index}] Element text preview: "${allText}"`);
               }
 
               // Try to extract MIME type from DOM or filename
@@ -191,88 +213,109 @@
 
         // Helper function to extract URL from DOM with improved logic
         const extractUrlFromDOM = (element, index) => {
-          if (!element) return null;
+          if (!element) {
+            console.error(`[Attachment ${index}] ✗ No element provided for DOM extraction`);
+            return null;
+          }
 
           console.log(`[Attachment ${index}] Searching for download URL in DOM...`);
 
-          // DEBUG: Log the entire element structure
-          console.log(`[Attachment ${index}] Element classes:`, element.className);
-          console.log(`[Attachment ${index}] Element HTML (first 500 chars):`, element.outerHTML.substring(0, 500));
-
-          // Find all links in the attachment card
+          // Find all links and images in the attachment card and parent elements
           const allLinks = element.querySelectorAll('a');
-          console.log(`[Attachment ${index}] Found ${allLinks.length} links in element`);
+          const allImages = element.querySelectorAll('img');
 
+          console.log(`[Attachment ${index}] Found ${allLinks.length} links and ${allImages.length} images`);
+
+          // Log all links for debugging
           allLinks.forEach((link, i) => {
-            console.log(`[Attachment ${index}] Link ${i}: href="${link.href?.substring(0, 100)}" download="${link.download}" class="${link.className}"`);
+            const href = link.href || '';
+            const download = link.getAttribute('download') || '';
+            const hasGoogleusercontent = href.includes('googleusercontent.com');
+            const hasMailDomain = href.includes('/mail/');
+            console.log(`[Attachment ${index}] Link ${i}: ${hasGoogleusercontent ? 'googleusercontent' : hasMailDomain ? 'gmail' : 'other'} | download="${download}" | href="${href.substring(0, 120)}"`);
           });
 
           // Priority 1: Download link with explicit download attribute
           const downloadLink = element.querySelector('a[download][href*="googleusercontent.com"]');
           if (downloadLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Found download link with download attribute`);
+            console.log(`[Attachment ${index}] ✓ Method 1: Found download link with download attribute`);
             return downloadLink.href;
           }
 
           // Priority 2: Direct mail-attachment URL
           const attachmentLink = element.querySelector('a[href*="mail-attachment.googleusercontent.com"]');
           if (attachmentLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Found mail-attachment link`);
+            console.log(`[Attachment ${index}] ✓ Method 2: Found mail-attachment link`);
             return attachmentLink.href;
           }
 
-          // Priority 3: Look for redirect URLs that Gmail uses
-          const redirectLink = element.querySelector('a[href*="/mail/"][href*="?ui=2"][href*="&view=att"]');
+          // Priority 3: Look for redirect URLs that Gmail uses (common pattern)
+          const redirectLink = element.querySelector('a[href*="/mail/"][href*="view=att"]');
           if (redirectLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Found Gmail redirect link`);
+            console.log(`[Attachment ${index}] ✓ Method 3: Found Gmail attachment view link`);
             return redirectLink.href;
           }
 
-          // Priority 4: Look for any link that contains "view" or "download" in the URL
-          const viewLink = element.querySelector('a[href*="view"], a[href*="download"], a[href*="disp=attd"]');
-          if (viewLink?.href && viewLink.href.includes('googleusercontent.com')) {
-            console.log(`[Attachment ${index}] ✓ Found view/download link`);
-            return viewLink.href;
+          // Priority 4: Look for attachment ID in Gmail URL structure
+          const gmailAttLink = element.querySelector('a[href*="attid="]');
+          if (gmailAttLink?.href) {
+            console.log(`[Attachment ${index}] ✓ Method 4: Found Gmail link with attid parameter`);
+            return gmailAttLink.href;
           }
 
-          // Priority 5: Look for ANY googleusercontent link that's not an image preview
+          // Priority 5: Look for any link that contains "disp=attd" (disposition: attachment)
+          const dispAttLink = element.querySelector('a[href*="disp=attd"]');
+          if (dispAttLink?.href) {
+            console.log(`[Attachment ${index}] ✓ Method 5: Found link with disp=attd`);
+            return dispAttLink.href;
+          }
+
+          // Priority 6: Look for ANY googleusercontent link that's not a thumbnail
           for (const link of allLinks) {
-            if (link.href && link.href.includes('googleusercontent.com') &&
-                !link.href.includes('=s') && !link.href.includes('sz=')) {
-              console.log(`[Attachment ${index}] ✓ Found googleusercontent link without size params`);
-              return link.href;
+            if (link.href && link.href.includes('googleusercontent.com')) {
+              const isThumbnail = link.href.includes('=s') || link.href.includes('sz=') ||
+                                  link.href.includes('=w') || link.href.includes('=h');
+              if (!isThumbnail) {
+                console.log(`[Attachment ${index}] ✓ Method 6: Found googleusercontent link without thumbnail params`);
+                return link.href;
+              }
             }
           }
 
-          // Priority 6: Try to construct URL from Gmail's structure
+          // Priority 7: Look for ANY Gmail mail link
           const gmailLink = element.querySelector('a[href*="/mail/"]');
           if (gmailLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Found Gmail internal link: ${gmailLink.href.substring(0, 100)}`);
-            // Check if it has attachment parameters
-            if (gmailLink.href.includes('attid=') || gmailLink.href.includes('view=att')) {
-              return gmailLink.href;
+            const href = gmailLink.href;
+            if (href.includes('view=') || href.includes('attid=') || href.includes('attach')) {
+              console.log(`[Attachment ${index}] ✓ Method 7: Found Gmail link: ${href.substring(0, 100)}`);
+              return href;
             }
           }
 
-          // Priority 7: Try to find the preview link and modify it
-          const previewLink = element.querySelector('a[href*="googleusercontent.com"]');
-          if (previewLink?.href) {
-            const cleanedUrl = removeUrlImageParameters(previewLink.href);
-            if (cleanedUrl !== previewLink.href) {
-              console.log(`[Attachment ${index}] ✓ Found preview link, cleaned parameters`);
+          // Priority 8: Try to find ANY googleusercontent link and clean it
+          const anyGoogleLink = element.querySelector('a[href*="googleusercontent.com"]');
+          if (anyGoogleLink?.href) {
+            const cleanedUrl = removeUrlImageParameters(anyGoogleLink.href);
+            console.log(`[Attachment ${index}] ✓ Method 8: Found googleusercontent link, cleaning parameters`);
+            console.log(`[Attachment ${index}]   Original: ${anyGoogleLink.href.substring(0, 100)}`);
+            console.log(`[Attachment ${index}]   Cleaned:  ${cleanedUrl.substring(0, 100)}`);
+            return cleanedUrl;
+          }
+
+          // Priority 9: Check image sources and clean them (last resort)
+          for (const img of allImages) {
+            if (img.src && img.src.includes('googleusercontent.com')) {
+              const cleanedUrl = removeUrlImageParameters(img.src);
+              console.warn(`[Attachment ${index}] ⚠ Method 9 (FALLBACK): Using cleaned image src`);
+              console.log(`[Attachment ${index}]   Image src: ${img.src.substring(0, 100)}`);
+              console.log(`[Attachment ${index}]   Cleaned:   ${cleanedUrl.substring(0, 100)}`);
               return cleanedUrl;
             }
           }
 
-          // Priority 8: Image source (last resort)
-          const imageSrc = element.querySelector('img[src*="googleusercontent.com"]');
-          if (imageSrc?.src) {
-            console.warn(`[Attachment ${index}] ⚠ FALLBACK: Using image src (likely thumbnail)`);
-            console.log(`[Attachment ${index}] Image src: ${imageSrc.src.substring(0, 100)}`);
-            return removeUrlImageParameters(imageSrc.src);
-          }
-
-          console.error(`[Attachment ${index}] ✗ No download URL found in DOM after checking all methods`);
+          console.error(`[Attachment ${index}] ✗ No download URL found in DOM after trying all 9 methods`);
+          console.error(`[Attachment ${index}] Element classes: ${element.className}`);
+          console.error(`[Attachment ${index}] Element HTML preview: ${element.outerHTML.substring(0, 300)}`);
           return null;
         };
 
