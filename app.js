@@ -37,6 +37,41 @@
           throw new Error('InboxSDK could not be initialised');
         }
 
+        // Helper function to retry getting download URL with delay
+        const getDownloadURLWithRetry = async (attachmentCardView, index, maxRetries = 3) => {
+          for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+              console.log(`[Attachment ${index}] Attempt ${attempt}/${maxRetries} to get download URL...`);
+
+              const url = await attachmentCardView.getDownloadURL();
+
+              if (url && typeof url === 'string' && url.length > 0) {
+                // Verify it's not a thumbnail URL
+                if (url.includes('=s') || url.includes('sz=')) {
+                  console.warn(`[Attachment ${index}] InboxSDK returned thumbnail URL, will retry...`);
+                  if (attempt < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+                    continue;
+                  }
+                }
+                console.log(`[Attachment ${index}] Successfully got download URL from InboxSDK`);
+                return url;
+              }
+
+              console.warn(`[Attachment ${index}] getDownloadURL returned empty/null, retrying...`);
+            } catch (error) {
+              console.warn(`[Attachment ${index}] getDownloadURL attempt ${attempt} failed:`, error.message);
+            }
+
+            if (attempt < maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 500 * attempt));
+            }
+          }
+
+          console.error(`[Attachment ${index}] All ${maxRetries} attempts to get download URL failed`);
+          return null;
+        };
+
         // Helper function to extract attachment metadata
         const extractAttachmentMetadata = async (attachmentCardView, index) => {
           const metadata = {
@@ -122,31 +157,58 @@
 
         // Helper function to extract URL from DOM with improved logic
         const extractUrlFromDOM = (element, index) => {
+          if (!element) return null;
+
+          console.log(`[Attachment ${index}] Searching for download URL in DOM...`);
+
           // Priority 1: Download link with explicit download attribute
           const downloadLink = element.querySelector('a[download][href*="googleusercontent.com"]');
           if (downloadLink?.href) {
+            console.log(`[Attachment ${index}] Found download link with download attribute`);
             return downloadLink.href;
           }
 
-          // Priority 2: Attachment link (not image thumbnail)
+          // Priority 2: Direct mail-attachment URL
           const attachmentLink = element.querySelector('a[href*="mail-attachment.googleusercontent.com"]');
           if (attachmentLink?.href) {
+            console.log(`[Attachment ${index}] Found mail-attachment link`);
             return attachmentLink.href;
           }
 
-          // Priority 3: General googleusercontent link without download attribute
-          const imageLink = element.querySelector('a:not([download])[href*="googleusercontent.com/attachment"]');
-          if (imageLink?.href && !imageLink.href.includes('/sz=')) {
-            return imageLink.href;
+          // Priority 3: Look for any link that contains "view" or "download" in the URL
+          const viewLink = element.querySelector('a[href*="view"], a[href*="download"], a[href*="disp=attd"]');
+          if (viewLink?.href && viewLink.href.includes('googleusercontent.com')) {
+            console.log(`[Attachment ${index}] Found view/download link`);
+            return viewLink.href;
           }
 
-          // Priority 4: Image source (last resort, needs parameter cleaning)
+          // Priority 4: Look for ANY googleusercontent link that's not an image preview
+          const allLinks = element.querySelectorAll('a[href*="googleusercontent.com"]');
+          for (const link of allLinks) {
+            if (link.href && !link.href.includes('=s') && !link.href.includes('sz=')) {
+              console.log(`[Attachment ${index}] Found googleusercontent link without size params`);
+              return link.href;
+            }
+          }
+
+          // Priority 5: Try to find the preview link and modify it
+          const previewLink = element.querySelector('a[href*="googleusercontent.com"]');
+          if (previewLink?.href) {
+            const cleanedUrl = removeUrlImageParameters(previewLink.href);
+            if (cleanedUrl !== previewLink.href) {
+              console.log(`[Attachment ${index}] Found preview link, cleaned parameters`);
+              return cleanedUrl;
+            }
+          }
+
+          // Priority 6: Image source (last resort)
           const imageSrc = element.querySelector('img[src*="googleusercontent.com"]');
           if (imageSrc?.src) {
-            console.warn(`Attachment ${index}: Falling back to image src, may be thumbnail`);
+            console.warn(`[Attachment ${index}] FALLBACK: Using image src (likely thumbnail)`);
             return removeUrlImageParameters(imageSrc.src);
           }
 
+          console.error(`[Attachment ${index}] No download URL found in DOM`);
           return null;
         };
 
@@ -198,28 +260,22 @@
             const metadata = await extractAttachmentMetadata(attachmentCardView, index);
             console.log(`Attachment ${index + 1}: "${metadata.filename}" (Type: ${metadata.type || 'unknown'}, Size: ${metadata.size || 'unknown'})`);
 
-            let downloadUrl = null;
-            try {
-              const directUrl = await attachmentCardView.getDownloadURL();
-              if (typeof directUrl === 'string' && directUrl.length > 0) {
-                downloadUrl = directUrl;
-                console.log(`Using InboxSDK URL for attachment ${index + 1}`);
-              }
-            } catch (error) {
-              console.warn(`getDownloadURL failed (index ${index}):`, error);
-            }
+            // Try to get download URL with retry logic
+            let downloadUrl = await getDownloadURLWithRetry(attachmentCardView, index + 1);
 
+            // If InboxSDK retry failed, use DOM fallback
             if (!downloadUrl) {
+              console.warn(`[Attachment ${index + 1}] InboxSDK failed after retries, using DOM fallback...`);
               try {
                 const element = attachmentCardView.getElement();
                 if (element) {
-                  downloadUrl = extractUrlFromDOM(element, index);
+                  downloadUrl = extractUrlFromDOM(element, index + 1);
                   if (downloadUrl) {
-                    console.log(`Using DOM fallback URL for attachment ${index + 1}`);
+                    console.log(`[Attachment ${index + 1}] Successfully extracted URL from DOM`);
                   }
                 }
               } catch (error) {
-                console.error(`Failed to read attachment URL from DOM (index ${index}):`, error);
+                console.error(`[Attachment ${index + 1}] DOM extraction failed:`, error);
               }
             }
 
