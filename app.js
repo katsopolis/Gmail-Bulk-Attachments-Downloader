@@ -327,49 +327,72 @@
           return result;
         };
 
+        // Extract attachment URLs and metadata
+        const extractAttachmentData = async (views) => {
+          const attachments = [];
+
+          for (let index = 0; index < views.length; index++) {
+            const attachmentCardView = views[index];
+            if (!attachmentCardView) {
+              continue;
+            }
+
+            try {
+              // Extract attachment metadata
+              const metadata = await extractAttachmentMetadata(attachmentCardView, index);
+
+              // Try to get download URL with retry logic
+              let downloadUrl = await getDownloadURLWithRetry(attachmentCardView, index + 1);
+
+              // If InboxSDK retry failed, use DOM fallback
+              if (!downloadUrl) {
+                try {
+                  const element = attachmentCardView.getElement();
+                  if (element) {
+                    downloadUrl = extractUrlFromDOM(element, index + 1);
+                  }
+                } catch (error) {
+                  // Silent error handling
+                }
+              }
+
+              if (!downloadUrl) {
+                throw new Error(`No download URL found for "${metadata.filename}" (index ${index}).`);
+              }
+
+              // Validate URL quality
+              const urlQuality = validateDownloadUrl(downloadUrl);
+
+              attachments.push({
+                url: downloadUrl,
+                filename: metadata.filename,
+                metadata: metadata
+              });
+            } catch (error) {
+              // Silent error handling, skip this attachment
+            }
+          }
+
+          return attachments;
+        };
+
+        // Handler for downloading all attachments separately
         const handleAttachmentsButtonClick = async (event) => {
           const views = event?.attachmentCardViews;
           if (!Array.isArray(views) || views.length === 0) {
             return;
           }
 
-          const tasks = views.map(async (attachmentCardView, index) => {
-            if (!attachmentCardView) {
-              throw new Error(`AttachmentCardView missing (index ${index}).`);
-            }
+          const attachments = await extractAttachmentData(views);
 
-            // Extract attachment metadata
-            const metadata = await extractAttachmentMetadata(attachmentCardView, index);
-
-            // Try to get download URL with retry logic
-            let downloadUrl = await getDownloadURLWithRetry(attachmentCardView, index + 1);
-
-            // If InboxSDK retry failed, use DOM fallback
-            if (!downloadUrl) {
-              try {
-                const element = attachmentCardView.getElement();
-                if (element) {
-                  downloadUrl = extractUrlFromDOM(element, index + 1);
-                }
-              } catch (error) {
-                // Silent error handling
-              }
-            }
-
-            if (!downloadUrl) {
-              throw new Error(`No download URL found for "${metadata.filename}" (index ${index}).`);
-            }
-
-            // Validate URL quality
-            const urlQuality = validateDownloadUrl(downloadUrl);
-
+          const tasks = attachments.map((attachment) => {
             return new Promise((resolve, reject) => {
               downloadAttachment(
-                downloadUrl,
-                metadata.filename,
-                metadata,
-                () => resolve({ status: 'success', index, filename: metadata.filename }),
-                (error) => reject(new Error(`Download failed for "${metadata.filename}" (index ${index}): ${error.message}`))
+                attachment.url,
+                attachment.filename,
+                attachment.metadata,
+                () => resolve({ status: 'success', filename: attachment.filename }),
+                (error) => reject(new Error(`Download failed for "${attachment.filename}": ${error.message}`))
               );
             });
           });
@@ -377,12 +400,49 @@
           const results = await Promise.allSettled(tasks);
         };
 
+        // Handler for downloading all attachments as ZIP
+        const handleAttachmentsZipButtonClick = async (event) => {
+          const views = event?.attachmentCardViews;
+          if (!Array.isArray(views) || views.length === 0) {
+            return;
+          }
+
+          try {
+            const attachments = await extractAttachmentData(views);
+
+            if (attachments.length === 0) {
+              alert('No attachments found to download.');
+              return;
+            }
+
+            // Generate filename based on email subject or date
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+            const zipFilename = `gmail-attachments-${timestamp}.zip`;
+
+            await downloadAttachmentsAsZip(attachments, zipFilename);
+
+            // Optional: Show success message
+            console.log(`Successfully created ZIP with ${attachments.length} attachments`);
+          } catch (error) {
+            console.error('ZIP download error:', error);
+            alert(`Failed to create ZIP file: ${error.message}`);
+          }
+        };
+
         const addCustomAttachmentsToolbarButton = (messageView) => {
           try {
+            // Add "Download all separately" button
             messageView.addAttachmentsToolbarButton({
-              tooltip: 'Download all',
+              tooltip: 'Download all separately',
               iconUrl: chrome.runtime.getURL('img/save.png'),
               onClick: handleAttachmentsButtonClick
+            });
+
+            // Add "Download as ZIP" button
+            messageView.addAttachmentsToolbarButton({
+              tooltip: 'Download all as ZIP',
+              iconUrl: chrome.runtime.getURL('img/save.png'),
+              onClick: handleAttachmentsZipButtonClick
             });
           } catch (error) {
             // Silent error handling

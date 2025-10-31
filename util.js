@@ -150,3 +150,90 @@ function removeUrlImageParameters(url) {
 
   return url;
 }
+
+// Download all attachments as a single ZIP file
+async function downloadAttachmentsAsZip(attachments, zipFilename = 'gmail-attachments.zip') {
+  try {
+    if (!attachments || attachments.length === 0) {
+      throw new Error('No attachments to download');
+    }
+
+    if (typeof JSZip === 'undefined') {
+      throw new Error('JSZip library not loaded');
+    }
+
+    console.log(`Creating ZIP file with ${attachments.length} attachments...`);
+    const zip = new JSZip();
+    const downloadPromises = [];
+
+    // Download each attachment and add to ZIP
+    for (let i = 0; i < attachments.length; i++) {
+      const attachment = attachments[i];
+      const { url, filename, metadata } = attachment;
+
+      const downloadPromise = (async () => {
+        try {
+          console.log(`Fetching: ${filename} (${i + 1}/${attachments.length})`);
+
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+
+          const blob = await response.blob();
+          console.log(`Added to ZIP: ${filename} (${formatBytesClient(blob.size)})`);
+
+          // Use sanitized filename to avoid ZIP issues
+          const safeFilename = sanitizeFilename(filename || `attachment_${i + 1}`, `attachment_${i + 1}`);
+          zip.file(safeFilename, blob);
+        } catch (error) {
+          console.error(`Failed to fetch ${filename}:`, error);
+          // Add error note to ZIP instead of failing entirely
+          zip.file(`ERROR_${filename}.txt`, `Failed to download this file: ${error.message}`);
+        }
+      })();
+
+      downloadPromises.push(downloadPromise);
+    }
+
+    // Wait for all downloads to complete
+    await Promise.all(downloadPromises);
+
+    console.log('Generating ZIP file...');
+    const zipBlob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      compressionOptions: { level: 6 }
+    });
+
+    console.log(`ZIP file created: ${formatBytesClient(zipBlob.size)}`);
+
+    // Create download link and trigger download
+    const url = URL.createObjectURL(zipBlob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = sanitizeFilename(zipFilename, 'attachments') || 'gmail-attachments.zip';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    // Clean up blob URL after a short delay
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+
+    console.log('ZIP download started successfully!');
+    return { success: true, count: attachments.length };
+  } catch (error) {
+    console.error('ZIP download failed:', error);
+    throw error;
+  }
+}
+
+// Helper function to format bytes (client-side version)
+function formatBytesClient(bytes, decimals = 2) {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
