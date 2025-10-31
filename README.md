@@ -1,6 +1,4 @@
-﻿# Gmail Bulk Attachments Downloader
-
-![Extension logo](img/logo_128-revert.png)
+![Extension logo](img/logo_128-revert.png) ﻿# Gmail Bulk Attachments Downloader
 
 Gmail Bulk Attachments Downloader adds a toolbar button that downloads every attachment in the open Gmail conversation as a single ZIP file, preserving each file's original name, format, and size.
 
