@@ -43,8 +43,6 @@
             const element = attachmentCardView.getElement();
             if (!element) return;
 
-            console.log(`[Attachment ${index}] Triggering URL generation via hover/focus...`);
-
             // Simulate mouse hover to trigger lazy loading
             const mouseenterEvent = new MouseEvent('mouseenter', {
               view: window,
@@ -62,7 +60,7 @@
             // Wait a bit for Gmail to generate URLs
             await new Promise(resolve => setTimeout(resolve, 200));
           } catch (error) {
-            console.warn(`[Attachment ${index}] Failed to trigger URL generation:`, error.message);
+            // Silent error handling
           }
         };
 
@@ -73,23 +71,17 @@
 
           for (let attempt = 1; attempt <= maxRetries; attempt++) {
             try {
-              console.log(`[Attachment ${index}] Attempt ${attempt}/${maxRetries} to get download URL from InboxSDK...`);
-
               const url = await attachmentCardView.getDownloadURL();
 
               if (url && typeof url === 'string' && url.length > 0) {
                 // Verify it's not a thumbnail URL
                 if (url.includes('=s') || url.includes('sz=')) {
-                  console.warn(`[Attachment ${index}] InboxSDK returned thumbnail URL, switching to DOM extraction...`);
                   break; // Don't retry, go to DOM extraction
                 }
-                console.log(`[Attachment ${index}] ✓ Successfully got download URL from InboxSDK`);
                 return url;
               }
-
-              console.warn(`[Attachment ${index}] InboxSDK getDownloadURL returned empty/null`);
             } catch (error) {
-              console.warn(`[Attachment ${index}] InboxSDK getDownloadURL failed:`, error.message);
+              // Silent error handling
             }
 
             if (attempt < maxRetries) {
@@ -97,7 +89,6 @@
             }
           }
 
-          console.log(`[Attachment ${index}] InboxSDK method failed, will use DOM extraction fallback`);
           return null;
         };
 
@@ -114,14 +105,13 @@
           try {
             metadata.filename = await attachmentCardView.getTitle();
           } catch (error) {
-            console.warn(`Could not read filename (index ${index}):`, error);
             metadata.filename = `attachment_${index}_${Date.now()}.download`;
           }
 
           try {
             metadata.attachmentType = attachmentCardView.getAttachmentType();
           } catch (error) {
-            console.warn(`Could not read attachment type (index ${index}):`, error);
+            // Silent error handling
           }
 
           try {
@@ -131,7 +121,6 @@
               const driveLink = element.querySelector('a[href*="drive.google.com"]');
               if (driveLink) {
                 metadata.isDriveFile = true;
-                console.log(`[Attachment ${index}] Detected as Google Drive file`);
               }
               // Try multiple methods to extract file size from DOM
               const sizeSelectors = [
@@ -153,24 +142,11 @@
                     const sizeMatch = text.match(/\(?(\d+\.?\d*\s*[KMGT]?B)\)?/i);
                     if (sizeMatch) {
                       metadata.size = sizeMatch[1].trim();
-                      console.log(`[Attachment ${index}] Found size: ${metadata.size} in element with selector: ${selector}`);
                       break;
                     }
                   }
                 }
                 if (metadata.size) break;
-              }
-
-              // If no size found, log for debugging
-              if (!metadata.size) {
-                if (metadata.isDriveFile) {
-                  console.log(`[Attachment ${index}] File size not available in DOM (Drive files download with correct size)`);
-                } else {
-                  console.warn(`[Attachment ${index}] Could not extract file size from DOM`);
-                  // Log all text content for debugging
-                  const allText = element.textContent.substring(0, 200);
-                  console.log(`[Attachment ${index}] Element text preview: "${allText}"`);
-                }
               }
 
               // Try to extract MIME type from DOM or filename
@@ -180,7 +156,7 @@
               }
             }
           } catch (error) {
-            console.warn(`Could not extract metadata from DOM (index ${index}):`, error);
+            // Silent error handling
           }
 
           return metadata;
@@ -225,27 +201,12 @@
         // Helper function to extract URL from DOM with improved logic
         const extractUrlFromDOM = (element, index) => {
           if (!element) {
-            console.error(`[Attachment ${index}] ✗ No element provided for DOM extraction`);
             return null;
           }
-
-          console.log(`[Attachment ${index}] Searching for download URL in DOM...`);
 
           // Find all links and images in the attachment card and parent elements
           const allLinks = element.querySelectorAll('a');
           const allImages = element.querySelectorAll('img');
-
-          console.log(`[Attachment ${index}] Found ${allLinks.length} links and ${allImages.length} images`);
-
-          // Log all links for debugging
-          allLinks.forEach((link, i) => {
-            const href = link.href || '';
-            const download = link.getAttribute('download') || '';
-            const hasGoogleusercontent = href.includes('googleusercontent.com');
-            const hasMailDomain = href.includes('/mail/');
-            const hasDrive = href.includes('drive.google.com');
-            console.log(`[Attachment ${index}] Link ${i}: ${hasDrive ? 'drive' : hasGoogleusercontent ? 'googleusercontent' : hasMailDomain ? 'gmail' : 'other'} | download="${download}" | href="${href.substring(0, 120)}"`);
-          });
 
           // Priority 1: Google Drive links (HIGHEST PRIORITY for Drive-shared attachments)
           for (const link of allLinks) {
@@ -256,10 +217,6 @@
                 const fileId = driveMatch[1];
                 // Convert view URL to direct download URL
                 const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
-                console.log(`[Attachment ${index}] ✓ Method 1 (PRIORITY): Found Google Drive link`);
-                console.log(`[Attachment ${index}]   File ID: ${fileId}`);
-                console.log(`[Attachment ${index}]   View URL: ${link.href.substring(0, 100)}`);
-                console.log(`[Attachment ${index}]   Download URL: ${downloadUrl}`);
                 return downloadUrl;
               }
             }
@@ -268,35 +225,30 @@
           // Priority 2: Download link with explicit download attribute
           const downloadLink = element.querySelector('a[download][href*="googleusercontent.com"]');
           if (downloadLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 2: Found download link with download attribute`);
             return downloadLink.href;
           }
 
           // Priority 3: Direct mail-attachment URL
           const attachmentLink = element.querySelector('a[href*="mail-attachment.googleusercontent.com"]');
           if (attachmentLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 3: Found mail-attachment link`);
             return attachmentLink.href;
           }
 
           // Priority 4: Look for redirect URLs that Gmail uses (common pattern)
           const redirectLink = element.querySelector('a[href*="/mail/"][href*="view=att"]');
           if (redirectLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 4: Found Gmail attachment view link`);
             return redirectLink.href;
           }
 
           // Priority 5: Look for attachment ID in Gmail URL structure
           const gmailAttLink = element.querySelector('a[href*="attid="]');
           if (gmailAttLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 5: Found Gmail link with attid parameter`);
             return gmailAttLink.href;
           }
 
           // Priority 6: Look for any link that contains "disp=attd" (disposition: attachment)
           const dispAttLink = element.querySelector('a[href*="disp=attd"]');
           if (dispAttLink?.href) {
-            console.log(`[Attachment ${index}] ✓ Method 6: Found link with disp=attd`);
             return dispAttLink.href;
           }
 
@@ -306,7 +258,6 @@
               const isThumbnail = link.href.includes('=s') || link.href.includes('sz=') ||
                                   link.href.includes('=w') || link.href.includes('=h');
               if (!isThumbnail) {
-                console.log(`[Attachment ${index}] ✓ Method 7: Found googleusercontent link without thumbnail params`);
                 return link.href;
               }
             }
@@ -317,7 +268,6 @@
           if (gmailLink?.href) {
             const href = gmailLink.href;
             if (href.includes('view=') || href.includes('attid=') || href.includes('attach')) {
-              console.log(`[Attachment ${index}] ✓ Method 8: Found Gmail link: ${href.substring(0, 100)}`);
               return href;
             }
           }
@@ -326,9 +276,6 @@
           const anyGoogleLink = element.querySelector('a[href*="googleusercontent.com"]');
           if (anyGoogleLink?.href) {
             const cleanedUrl = removeUrlImageParameters(anyGoogleLink.href);
-            console.log(`[Attachment ${index}] ✓ Method 9: Found googleusercontent link, cleaning parameters`);
-            console.log(`[Attachment ${index}]   Original: ${anyGoogleLink.href.substring(0, 100)}`);
-            console.log(`[Attachment ${index}]   Cleaned:  ${cleanedUrl.substring(0, 100)}`);
             return cleanedUrl;
           }
 
@@ -336,16 +283,10 @@
           for (const img of allImages) {
             if (img.src && img.src.includes('googleusercontent.com')) {
               const cleanedUrl = removeUrlImageParameters(img.src);
-              console.warn(`[Attachment ${index}] ⚠ Method 10 (FALLBACK): Using cleaned image src`);
-              console.log(`[Attachment ${index}]   Image src: ${img.src.substring(0, 100)}`);
-              console.log(`[Attachment ${index}]   Cleaned:   ${cleanedUrl.substring(0, 100)}`);
               return cleanedUrl;
             }
           }
 
-          console.error(`[Attachment ${index}] ✗ No download URL found in DOM after trying all 10 methods`);
-          console.error(`[Attachment ${index}] Element classes: ${element.className}`);
-          console.error(`[Attachment ${index}] Element HTML preview: ${element.outerHTML.substring(0, 300)}`);
           return null;
         };
 
@@ -389,11 +330,8 @@
         const handleAttachmentsButtonClick = async (event) => {
           const views = event?.attachmentCardViews;
           if (!Array.isArray(views) || views.length === 0) {
-            console.error('No attachments available for download.');
             return;
           }
-
-          console.log(`Starting download of ${views.length} attachment(s)...`);
 
           const tasks = views.map(async (attachmentCardView, index) => {
             if (!attachmentCardView) {
@@ -402,24 +340,19 @@
 
             // Extract attachment metadata
             const metadata = await extractAttachmentMetadata(attachmentCardView, index);
-            console.log(`Attachment ${index + 1}: "${metadata.filename}" (Type: ${metadata.type || 'unknown'}, Size: ${metadata.size || 'unknown'})`);
 
             // Try to get download URL with retry logic
             let downloadUrl = await getDownloadURLWithRetry(attachmentCardView, index + 1);
 
             // If InboxSDK retry failed, use DOM fallback
             if (!downloadUrl) {
-              console.warn(`[Attachment ${index + 1}] InboxSDK failed after retries, using DOM fallback...`);
               try {
                 const element = attachmentCardView.getElement();
                 if (element) {
                   downloadUrl = extractUrlFromDOM(element, index + 1);
-                  if (downloadUrl) {
-                    console.log(`[Attachment ${index + 1}] Successfully extracted URL from DOM`);
-                  }
                 }
               } catch (error) {
-                console.error(`[Attachment ${index + 1}] DOM extraction failed:`, error);
+                // Silent error handling
               }
             }
 
@@ -429,11 +362,6 @@
 
             // Validate URL quality
             const urlQuality = validateDownloadUrl(downloadUrl);
-            if (urlQuality.isDrive) {
-              console.log(`[Attachment ${index + 1}] ✓ Using Google Drive direct download URL`);
-            } else if (urlQuality.isProxy || urlQuality.isThumbnail) {
-              console.warn(`[Attachment ${index + 1}] ⚠ URL may be a ${urlQuality.isProxy ? 'proxy' : 'thumbnail'}. File may differ from original.`);
-            }
 
             return new Promise((resolve, reject) => {
               downloadAttachment(
@@ -447,14 +375,6 @@
           });
 
           const results = await Promise.allSettled(tasks);
-          const succeeded = results.filter((r) => r.status === 'fulfilled').length;
-          const failed = results.filter((r) => r.status === 'rejected').length;
-
-          console.log(`Download complete: ${succeeded} succeeded, ${failed} failed`);
-
-          results
-            .filter((result) => result.status === 'rejected')
-            .forEach((result) => console.error(result.reason));
         };
 
         const addCustomAttachmentsToolbarButton = (messageView) => {
@@ -465,7 +385,7 @@
               onClick: handleAttachmentsButtonClick
             });
           } catch (error) {
-            console.error('Failed to add attachments toolbar button:', error);
+            // Silent error handling
           }
         };
 
@@ -475,18 +395,14 @@
               addCustomAttachmentsToolbarButton(messageView);
             }
           } catch (error) {
-            console.error('Failed to process message view:', error);
+            // Silent error handling
           }
         };
 
         sdk.Conversations.registerMessageViewHandler(messageViewHandler);
       })
       .catch((error) => {
-        console.error('InboxSDK initialization failed:', error);
-        chrome.runtime.sendMessage({
-          type: 'error',
-          message: 'Extension failed to start: ' + error.message
-        });
+        // Silent error handling - extension will fail gracefully
       });
   };
   start();
