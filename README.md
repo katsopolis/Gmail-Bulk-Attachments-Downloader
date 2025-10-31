@@ -2,13 +2,15 @@
 
 ![Extension logo](img/logo_128-revert.png)
 
-Gmail Bulk Attachments Downloader adds a toolbar button that downloads every attachment in the open Gmail conversation with a single click, preserving each file's original name, format, and size.
+Gmail Bulk Attachments Downloader adds a toolbar button that downloads every attachment in the open Gmail conversation as a single ZIP file, preserving each file's original name, format, and size.
 
 ## Key Features
-- Uses InboxSDK to request Gmail's official attachment download URLs instead of thumbnail proxies.
-- Sanitises filenames so Chrome writes the exact Gmail title safely to disk.
-- Falls back to DOM metadata when Gmail delays the download URL.
-- Skips Drive items when Gmail refuses to expose the original link and logs a warning so you can fetch them manually if needed.
+- **ZIP Download**: Bundles all attachments into a single ZIP file for convenient bulk download
+- **InboxSDK Integration**: Uses Gmail's official attachment download URLs instead of thumbnail proxies
+- **Google Drive Support**: Downloads Drive-shared attachments using background service worker to bypass CORS restrictions
+- **Filename Sanitization**: Ensures Chrome writes the exact Gmail title safely to disk
+- **Smart Fallbacks**: Uses DOM metadata extraction when Gmail delays the download URL
+- **JSZip Integration**: Creates ZIP archives client-side with proper file handling
 
 ## Preview
 Below is the toolbar button added by the extension:
@@ -22,8 +24,9 @@ Below is the toolbar button added by the extension:
 
 ## Usage
 1. Open any Gmail thread that contains attachments.
-2. Click the download button that appears next to the built-in Drive actions.
-3. Chrome queues individual downloads for every attachment using the original filenames. Check DevTools for warnings about Drive files that require manual retrieval.
+2. Click the **"Download all as ZIP"** button that appears in the attachments toolbar.
+3. The extension will fetch all attachments (including Google Drive files) and bundle them into a single ZIP file.
+4. The ZIP file will be automatically downloaded with a timestamp-based filename (e.g., `gmail-attachments-2025-10-31T12-30-45.zip`).
 
 ## Manifest Notes
 - Manifest V3 now ships with an inline description and author credit, removing the need for locale message bundles.
@@ -32,8 +35,16 @@ Below is the toolbar button added by the extension:
 
 ## Recent Updates
 
-### Version 1.0.2 - Performance & Analysis Optimization (Latest)
-- **Metadata Extraction**: Now extracts and logs file size, MIME type, and attachment type for each download
+### Version 1.0.3 - ZIP Download & Drive Support (Latest)
+- **ZIP Archive Download**: All attachments are now bundled into a single ZIP file for easier bulk download
+- **Google Drive CORS Bypass**: Implements background service worker to successfully download Drive-shared attachments
+- **Simplified UI**: Single "Download all as ZIP" button replaces separate download options
+- **JSZip Integration**: Client-side ZIP creation with proper binary file handling
+- **Timestamp-based Naming**: ZIP files automatically named with ISO timestamp for easy organization
+- **Drive Host Permissions**: Added `drive.google.com` to manifest permissions for seamless Drive file access
+
+### Version 1.0.2 - Performance & Analysis Optimization
+- **Metadata Extraction**: Extracts and logs file size, MIME type, and attachment type for each download
 - **URL Validation**: Detects and warns about proxy/thumbnail URLs that may differ from original files
 - **Enhanced URL Cleaning**: Improved parameter removal to prevent downloading thumbnails instead of full files
 - **Download Tracking**: Real-time progress monitoring with size verification after download completion
@@ -42,20 +53,71 @@ Below is the toolbar button added by the extension:
 - **File Type Detection**: Infers MIME types from file extensions with support for 30+ common formats
 
 ### Previous Updates
-- Rebranded the project and extension as **Gmail Bulk Attachments Downloader** with refreshed toolbar icons.
-- Ensured every attachment download depends on InboxSDK getDownloadURL() before touching the DOM.
-- Added URL normalisation, filename sanitisation, and DOM fallbacks to avoid JPEG/WebP proxy downloads.
-- Logged informative warnings when Gmail withholds a Drive URL so you can connect a Gmail or Drive API fallback if needed.
-- Normalised the toolbar icon CSS so the download button aligns with Gmail's native Drive action.
+- Rebranded the project and extension as **Gmail Bulk Attachments Downloader** with refreshed toolbar icons
+- Ensured every attachment download depends on InboxSDK getDownloadURL() before touching the DOM
+- Added URL normalisation, filename sanitisation, and DOM fallbacks to avoid JPEG/WebP proxy downloads
+- Logged informative warnings when Gmail withholds a Drive URL
+- Normalised the toolbar icon CSS so the download button aligns with Gmail's native Drive action
 
-## Technical Improvements
+## How It Works
 
-### File Size & Type Accuracy
-The extension now addresses the common issue where downloaded files differ from Gmail's attachment metadata:
-- Extracts file size from attachment card DOM elements
-- Infers MIME types from file extensions
-- Logs expected vs actual file sizes after download
-- Warns when URLs may point to thumbnails or proxies instead of original files
+### Architecture Overview
+The extension operates as a Chrome Manifest V3 extension with three main components:
+
+1. **Content Script (app.js)**
+   - Integrates with Gmail via InboxSDK to detect and interact with email attachments
+   - Extracts attachment metadata (filename, size, MIME type) from Gmail's DOM
+   - Implements smart URL extraction with multiple fallback strategies
+   - Coordinates ZIP creation and initiates background downloads for Drive files
+
+2. **Background Service Worker (background.js)**
+   - Handles CORS-restricted downloads (primarily Google Drive files)
+   - Acts as a proxy to bypass cross-origin restrictions
+   - Fetches files as ArrayBuffer and returns binary data to content script
+   - Maintains stable message channel for bulk transfer operations
+
+3. **ZIP Creation (JSZip)**
+   - Bundles all attachments into a single archive client-side
+   - Handles both direct downloads and background-fetched files
+   - Preserves original filenames and folder structure
+   - Generates downloadable Blob for browser's native download mechanism
+
+### Attachment Download Flow
+
+1. **Detection Phase**
+   - InboxSDK detects message view with attachments
+   - Extension adds "Download all as ZIP" button to attachments toolbar
+
+2. **URL Extraction Phase**
+   - For each attachment, attempts `getDownloadURL()` via InboxSDK API
+   - If unavailable, triggers DOM interaction (hover, focus) to lazy-load URLs
+   - Implements retry logic with exponential backoff
+   - Falls back to multi-priority DOM extraction when API fails
+
+3. **URL Priority System**
+   ```
+   Priority 1: Google Drive direct download URLs (drive.google.com/uc?export=download)
+   Priority 2: Download links with explicit download attribute
+   Priority 3: mail-attachment.googleusercontent.com URLs
+   Priority 4: Gmail redirect URLs with view=att parameter
+   Priority 5: Gmail URLs with attid parameter
+   Priority 6: URLs with disp=attd (disposition: attachment)
+   Priority 7: Non-thumbnail googleusercontent.com URLs
+   Priority 8: Gmail mail links with attachment indicators
+   Priority 9: Cleaned googleusercontent.com URLs (parameter stripped)
+   Priority 10: Cleaned image sources (last resort)
+   ```
+
+4. **Download Phase**
+   - **Drive Files**: Routed through background worker to bypass CORS
+   - **Gmail Attachments**: Direct fetch from content script
+   - All downloads converted to ArrayBuffer for consistent handling
+
+5. **ZIP Creation & Download**
+   - JSZip bundles all successful downloads
+   - Generates timestamped filename (ISO 8601 format)
+   - Creates Blob and triggers browser download
+   - Cleans up object URLs after download initiation
 
 ### URL Quality Detection
 The extension validates download URLs and warns about potential issues:
@@ -63,6 +125,13 @@ The extension validates download URLs and warns about potential issues:
 - Identifies proxy indicators (&disp=inline)
 - Prioritizes mail-attachment.googleusercontent.com URLs over image proxies
 - Enhanced parameter stripping to ensure original file download
+
+### Drive File Handling
+Special handling for Google Drive shared attachments:
+- Converts Drive view URLs to export/download format
+- Extracts file IDs from various Drive URL patterns
+- Uses background worker to avoid CORS errors
+- Maintains original filename from Gmail metadata
 
 ## License
 This project is released under the MIT License. See [LICENSE](LICENSE) for details.

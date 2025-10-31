@@ -376,30 +376,6 @@
           return attachments;
         };
 
-        // Handler for downloading all attachments separately
-        const handleAttachmentsButtonClick = async (event) => {
-          const views = event?.attachmentCardViews;
-          if (!Array.isArray(views) || views.length === 0) {
-            return;
-          }
-
-          const attachments = await extractAttachmentData(views);
-
-          const tasks = attachments.map((attachment) => {
-            return new Promise((resolve, reject) => {
-              downloadAttachment(
-                attachment.url,
-                attachment.filename,
-                attachment.metadata,
-                () => resolve({ status: 'success', filename: attachment.filename }),
-                (error) => reject(new Error(`Download failed for "${attachment.filename}": ${error.message}`))
-              );
-            });
-          });
-
-          const results = await Promise.allSettled(tasks);
-        };
-
         // Handler for downloading all attachments as ZIP
         const handleAttachmentsZipButtonClick = async (event) => {
           const views = event?.attachmentCardViews;
@@ -431,14 +407,7 @@
 
         const addCustomAttachmentsToolbarButton = (messageView) => {
           try {
-            // Add "Download all separately" button
-            messageView.addAttachmentsToolbarButton({
-              tooltip: 'Download all separately',
-              iconUrl: chrome.runtime.getURL('img/save.png'),
-              onClick: handleAttachmentsButtonClick
-            });
-
-            // Add "Download as ZIP" button
+            // Add "Download all as ZIP" button
             messageView.addAttachmentsToolbarButton({
               tooltip: 'Download all as ZIP',
               iconUrl: chrome.runtime.getURL('img/save.png'),
