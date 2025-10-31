@@ -175,12 +175,35 @@ async function downloadAttachmentsAsZip(attachments, zipFilename = 'gmail-attach
         try {
           console.log(`Fetching: ${filename} (${i + 1}/${attachments.length})`);
 
-          const response = await fetch(url);
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // Use background script to fetch the file (bypasses CORS restrictions)
+          const response = await new Promise((resolve, reject) => {
+            chrome.runtime.sendMessage(
+              {
+                type: 'fetchAttachmentBlob',
+                payload: { url, filename }
+              },
+              (response) => {
+                if (chrome.runtime.lastError) {
+                  reject(new Error(chrome.runtime.lastError.message));
+                  return;
+                }
+                if (response?.status === 'error') {
+                  reject(new Error(response.message));
+                  return;
+                }
+                resolve(response);
+              }
+            );
+          });
+
+          if (!response || !response.data) {
+            throw new Error('No data received from background script');
           }
 
-          const blob = await response.blob();
+          // Convert base64 data back to blob
+          const base64Response = await fetch(response.data);
+          const blob = await base64Response.blob();
+
           console.log(`Added to ZIP: ${filename} (${formatBytesClient(blob.size)})`);
 
           // Use sanitized filename to avoid ZIP issues
