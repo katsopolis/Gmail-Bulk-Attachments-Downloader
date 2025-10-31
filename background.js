@@ -91,6 +91,57 @@
 
     return true;
   }
+
+  if (message.type === 'fetchAttachmentBlob') {
+    const { url, filename } = message.payload;
+
+    if (!url) {
+      sendResponse({ status: 'error', message: 'URL is required' });
+      return;
+    }
+
+    console.log(`Fetching blob for ZIP: ${filename}`);
+
+    // Use fetch API from background script (has more permissions, bypasses CORS)
+    fetch(url)
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        return response.blob();
+      })
+      .then(blob => {
+        // Convert blob to base64 so we can send it via message
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          const base64data = reader.result;
+          console.log(`Blob fetched successfully: ${filename} (${formatBytes(blob.size)})`);
+          sendResponse({
+            status: 'success',
+            data: base64data,
+            size: blob.size,
+            type: blob.type
+          });
+        };
+        reader.onerror = () => {
+          console.error(`Failed to read blob for ${filename}`);
+          sendResponse({
+            status: 'error',
+            message: 'Failed to read blob data'
+          });
+        };
+        reader.readAsDataURL(blob);
+      })
+      .catch(error => {
+        console.error(`Failed to fetch ${filename}:`, error);
+        sendResponse({
+          status: 'error',
+          message: error.message || 'Failed to fetch'
+        });
+      });
+
+    return true; // Keep message channel open for async response
+  }
 });
 
 // Track download progress and log completion
